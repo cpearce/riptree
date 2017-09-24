@@ -2,16 +2,19 @@ extern crate argparse;
 extern crate itertools;
 extern crate ordered_float;
 extern crate rayon;
+// extern crate fishers_exact;
 
-#[cfg(test)]
-mod index;
+// #[cfg(test)]
+// mod index;
 
 mod itemizer;
 mod transaction_reader;
 mod fptree;
 mod generate_rules;
 mod command_line_args;
+mod index;
 
+use index::Index;
 use itemizer::Itemizer;
 use transaction_reader::TransactionReader;
 use fptree::FPTree;
@@ -101,7 +104,9 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
     };
     println!("Calculated maximum support as {} / {}.", max_count, num_transactions);
 
+    let mut index: Index = Index::new();
     for mut transaction in TransactionReader::new(&args.input_file_path, &mut itemizer) {
+        index.insert(&transaction);
         // Only include transactions which contain at least one rate item.
         if !contains_rare_item(&transaction, &item_count, max_count) {
             continue;
@@ -119,10 +124,12 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
     let timer = Instant::now();
     let patterns: Vec<ItemSet> = rip_growth(
         &fptree,
+        &fptree,
         max_count,
         &vec![],
         num_transactions as u32,
         &itemizer,
+        &index,
     );
 
     println!(

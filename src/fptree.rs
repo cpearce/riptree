@@ -1,11 +1,12 @@
 use itemizer::Itemizer;
+use index::Index;
 use rayon::prelude::*;
 use itertools::Itertools;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::cmp;
-
+// use fishers_exact::{fishers_exact,TestTails};
 
 #[derive(Eq, Debug)]
 struct FPNode {
@@ -124,6 +125,23 @@ impl FPTree {
     #[allow(dead_code)]
     pub fn print(&self, itemizer: &Itemizer) {
         self.root.print(itemizer, &self.item_count, 0);
+    }
+
+    fn single_path_len(&self) -> usize {
+        let mut node: &FPNode = &self.root;
+        let mut count = 0;
+        loop {
+            if node.children.len() > 1 {
+                return 0;
+            }
+            if node.children.len() == 1 {
+                node = &node.children[0];
+                count += 1;
+                continue;
+            }
+            // child has 0 children bottom of branch.
+            return count;
+        }
     }
 }
 
@@ -246,12 +264,34 @@ impl ItemSet {
     }
 }
 
+fn lfactorial(n: u32) -> f64 {
+  let mut r = 0.0;
+  for i in 2..n+1 {
+    r += (i as f64).ln();
+  }
+  r
+}
+
+fn pval(AB: u32, A: u32, B: u32, N: u32) -> f64 {
+  (lfactorial(B)
+    + lfactorial(N - B)
+    + lfactorial(A)
+    + lfactorial(N - A)
+    - lfactorial(AB)
+    - lfactorial(B - AB)
+    - lfactorial(A - AB)
+    - lfactorial(N - A - B + AB)
+    - lfactorial(N)).exp()
+}
+
 pub fn rip_growth(
+    initial_tree: &FPTree,
     fptree: &FPTree,
     max_count: u32,
     path: &[u32],
     path_count: u32,
     itemizer: &Itemizer,
+    index: &Index,
 ) -> Vec<ItemSet> {
     let mut itemsets: Vec<ItemSet> = vec![];
 
@@ -267,12 +307,32 @@ pub fn rip_growth(
         .keys()
         .map(|x| *x)
         .filter(|x| get_item_count(*x, fptree.item_count()) < max_count)
+        .filter(|&item| {
+            if path.len() == 0 {
+                return true;
+            }
+            let A = index.count(&[item]) as u32;
+            let B = index.count(&path) as u32;
+            let AB = cmp::min(path_count, get_item_count(item, fptree.item_count())) as u32;
+            let mut itemset: Vec<u32> = Vec::from(path);
+            itemset.push(item);
+            let AB = index.count(&itemset) as u32;
+        
+            let N = initial_tree.num_transactions as u32;
+            pval(AB, (B-AB), (A-AB), (N-A-B+AB)) < 0.05
+        })
         .collect();
     sort_transaction(&mut items, fptree.item_count(), SortOrder::Increasing);
 
     let x: Vec<ItemSet> = items
         .par_iter()
         .flat_map(|item| -> Vec<ItemSet> {
+
+            let single_path_len = fptree.single_path_len();
+            if single_path_len > 60 {
+                println!("path len= {}", single_path_len);
+            }
+
             // The path to here plus this item must be below the maximum
             // support threshold.
             let mut itemset: Vec<u32> = Vec::from(path);
@@ -280,15 +340,16 @@ pub fn rip_growth(
             itemset.push(*item);
 
             let mut result: Vec<ItemSet> = Vec::new();
-
             if let Some(item_list) = item_index.get(item) {
                 let conditional_tree = construct_conditional_tree(&parent_table, item_list);
                 let mut y = rip_growth(
+                    initial_tree,
                     &conditional_tree,
                     max_count,
                     &itemset,
                     new_path_count,
                     itemizer,
+                    &index,
                 );
                 result.append(&mut y);
             };
