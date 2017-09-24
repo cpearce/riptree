@@ -2,7 +2,7 @@ extern crate argparse;
 extern crate itertools;
 extern crate ordered_float;
 extern crate rayon;
-// extern crate fishers_exact;
+extern crate fishers_exact;
 
 // #[cfg(test)]
 // mod index;
@@ -120,6 +120,13 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
         timer.elapsed().as_secs()
     );
 
+    println!("Building lookup table for natural log...");
+    let mut ln_table = vec![];
+    ln_table.push(0.0);
+    for i in 1..num_transactions + 1 {
+        ln_table.push((i as f64).ln());
+    }
+
     println!("Starting recursive FPGrowth...");
     let timer = Instant::now();
     let patterns: Vec<ItemSet> = rip_growth(
@@ -130,6 +137,7 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
         num_transactions as u32,
         &itemizer,
         &index,
+        &ln_table,
     );
 
     println!(

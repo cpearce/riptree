@@ -74,6 +74,10 @@ impl Index {
         let count = self.count(transaction);
         (count as f64) / (self.transaction_count as f64)
     }
+
+    pub fn num_transactions(&self) -> usize {
+        self.transaction_count
+    }
 }
 
 #[cfg(test)]
