@@ -127,7 +127,7 @@ impl FPTree {
     }
 }
 
-fn get_item_count(item: u32, item_count: &HashMap<u32, u32>) -> u32 {
+pub fn get_item_count(item: u32, item_count: &HashMap<u32, u32>) -> u32 {
     match item_count.get(&item) {
         Some(count) => *count,
         None => 0,
@@ -246,9 +246,9 @@ impl ItemSet {
     }
 }
 
-pub fn fp_growth(
+pub fn rip_growth(
     fptree: &FPTree,
-    min_count: u32,
+    max_count: u32,
     path: &[u32],
     path_count: u32,
     itemizer: &Itemizer,
@@ -261,19 +261,19 @@ pub fn fp_growth(
     // Maps item id to vec of &FPNode's for those items.
     let item_index = make_item_index(&fptree);
 
-    // Get list of items in the tree which are above the minimum support
+    // Get list of items in the tree which are below the maximum support
     // threshold. Sort the list in increasing order of frequency.
     let mut items: Vec<u32> = item_index
         .keys()
         .map(|x| *x)
-        .filter(|x| get_item_count(*x, fptree.item_count()) > min_count)
+        .filter(|x| get_item_count(*x, fptree.item_count()) < max_count)
         .collect();
     sort_transaction(&mut items, fptree.item_count(), SortOrder::Increasing);
 
     let x: Vec<ItemSet> = items
         .par_iter()
         .flat_map(|item| -> Vec<ItemSet> {
-            // The path to here plus this item must be above the minimum
+            // The path to here plus this item must be below the maximum
             // support threshold.
             let mut itemset: Vec<u32> = Vec::from(path);
             let new_path_count = cmp::min(path_count, get_item_count(*item, fptree.item_count()));
@@ -283,9 +283,9 @@ pub fn fp_growth(
 
             if let Some(item_list) = item_index.get(item) {
                 let conditional_tree = construct_conditional_tree(&parent_table, item_list);
-                let mut y = fp_growth(
+                let mut y = rip_growth(
                     &conditional_tree,
-                    min_count,
+                    max_count,
                     &itemset,
                     new_path_count,
                     itemizer,
