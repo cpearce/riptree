@@ -250,16 +250,16 @@ fn lfactorial(n: u32, ln_table: &[f64]) -> f64 {
     ln_table[n as usize]
 }
 
-fn pval(AB: u32, A: u32, B: u32, N: u32, ln_table: &[f64]) -> f64 {
-  (lfactorial(B, ln_table)
-    + lfactorial(N - B, ln_table)
-    + lfactorial(A, ln_table)
-    + lfactorial(N - A, ln_table)
-    - lfactorial(AB, ln_table)
-    - lfactorial(B - AB, ln_table)
-    - lfactorial(A - AB, ln_table)
-    - lfactorial(N - A - B + AB, ln_table)
-    - lfactorial(N, ln_table)).exp()
+fn pval(ab: u32, a: u32, b: u32, n: u32, ln_table: &[f64]) -> f64 {
+  (lfactorial(b, ln_table)
+    + lfactorial(n - b, ln_table)
+    + lfactorial(a, ln_table)
+    + lfactorial(n - a, ln_table)
+    - lfactorial(ab, ln_table)
+    - lfactorial(b - ab, ln_table)
+    - lfactorial(a - ab, ln_table)
+    - lfactorial(n - a - b + ab, ln_table)
+    - lfactorial(n, ln_table)).exp()
 }
 
 pub fn rip_growth(
@@ -290,15 +290,13 @@ pub fn rip_growth(
             if path.len() == 0 {
                 return true;
             }
-            let A = index.count(&[item]) as u32;
-            let B = index.count(&path) as u32;
-            let AB = cmp::min(path_count, get_item_count(item, fptree.item_count())) as u32;
+            let a = index.count(&[item]) as u32;
+            let b = index.count(&path) as u32;
             let mut itemset: Vec<u32> = Vec::from(path);
             itemset.push(item);
-            let AB = index.count(&itemset) as u32;
-        
-            let N = index.num_transactions() as u32;
-            let pv = pval(AB, A, B, N, ln_table);
+            let ab = index.count(&itemset) as u32;
+            let n = index.num_transactions() as u32;
+            let pv = pval(ab, a, b, n, ln_table);
             pv < 0.05
         })
         .collect();
