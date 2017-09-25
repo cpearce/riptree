@@ -70,6 +70,7 @@ impl Index {
         count        
     }
 
+    #[allow(dead_code)]
     pub fn support(&self, transaction: &[u32]) -> f64 {
         let count = self.count(transaction);
         (count as f64) / (self.transaction_count as f64)
