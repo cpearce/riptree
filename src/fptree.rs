@@ -286,21 +286,25 @@ pub fn rip_growth(
         .keys()
         .map(|x| *x)
         .filter(|x| get_item_count(*x, fptree.item_count()) < max_count)
-        .filter(|&item| {
+        .collect();
+    sort_transaction(&mut items, fptree.item_count(), SortOrder::Increasing);
+
+    let mut items: Vec<u32> = items.iter()
+        .map(|x| *x)
+        .filter(|item| {
             if path.len() == 0 {
                 return true;
             }
-            let a = index.count(&[item]) as u32;
+            let a = index.count(&[*item]) as u32;
             let b = index.count(&path) as u32;
             let mut itemset: Vec<u32> = Vec::from(path);
-            itemset.push(item);
+            itemset.push(*item);
             let ab = index.count(&itemset) as u32;
             let n = index.num_transactions() as u32;
             let pv = pval(ab, a, b, n, ln_table);
             pv < 0.05
         })
         .collect();
-    sort_transaction(&mut items, fptree.item_count(), SortOrder::Increasing);
 
     let x: Vec<ItemSet> = items
         .par_iter()
