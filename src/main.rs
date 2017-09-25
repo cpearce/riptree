@@ -2,10 +2,6 @@ extern crate argparse;
 extern crate itertools;
 extern crate ordered_float;
 extern crate rayon;
-extern crate fishers_exact;
-
-// #[cfg(test)]
-// mod index;
 
 mod itemizer;
 mod transaction_reader;
@@ -32,7 +28,6 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufWriter, Write};
-// use std::fs;
 use std::process;
 use std::time::Instant;
 
@@ -120,12 +115,16 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
         timer.elapsed().as_secs()
     );
 
-    println!("Building lookup table for natural log...");
+    println!("Building lookup table for natural log/factorial...");
+    let timer = Instant::now();
     let mut ln_table = vec![];
     ln_table.push(0.0);
-    for i in 1..num_transactions + 1 {
-        ln_table.push((i as f64).ln());
+    ln_table.push(0.0);
+    for i in 2..num_transactions + 1 {
+        let prev = ln_table[i-1];
+        ln_table.push(prev + (i as f64).ln());
     }
+    println!("Done in {} seconds.", timer.elapsed().as_secs());
 
     println!("Starting recursive FPGrowth...");
     let timer = Instant::now();

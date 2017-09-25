@@ -6,7 +6,6 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::cmp;
-use fishers_exact::{fishers_exact,TestTails};
 
 #[derive(Eq, Debug)]
 struct FPNode {
@@ -265,11 +264,7 @@ impl ItemSet {
 }
 
 fn lfactorial(n: u32, ln_table: &[f64]) -> f64 {
-  let mut r = 0.0;
-  for i in 2..n+1 {
-    r += ln_table[i as usize];
-  }
-  r
+    ln_table[n as usize]
 }
 
 fn pval(AB: u32, A: u32, B: u32, N: u32, ln_table: &[f64]) -> f64 {
@@ -320,18 +315,7 @@ pub fn rip_growth(
             let AB = index.count(&itemset) as u32;
         
             let N = index.num_transactions() as u32;
-            // println!("calling pval({}, {}, {}, {})", AB, A, B, N);
             let pv = pval(AB, A, B, N, ln_table);
-            // println!("pval({}, {}, {}, {}) = {}", AB, A, B, N, pv);
-            assert!(A >= AB);
-            assert!(B >= AB);
-            assert!(N >= (A+B - AB));
-            // let table = [AB as i32, (B-AB) as i32, (A-AB) as i32, (N-A-B+AB) as i32 ];
-            // println!("CAlling fishers_exact {:?}", &table);
-            // let fv = fishers_exact(&table, TestTails::Two);
-            // println!("fishers_exact {:?} = {}", &table, fv);
-            // assert!(pv - fv < 0.05);
-            // println!("Was ok");
             pv < 0.05
         })
         .collect();
@@ -341,11 +325,6 @@ pub fn rip_growth(
         .par_iter()
         // .iter()
         .flat_map(|item| -> Vec<ItemSet> {
-
-            let single_path_len = fptree.single_path_len();
-            if single_path_len > 60 {
-                println!("path len= {}", single_path_len);
-            }
 
             // The path to here plus this item must be below the maximum
             // support threshold.
