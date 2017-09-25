@@ -125,23 +125,6 @@ impl FPTree {
     pub fn print(&self, itemizer: &Itemizer) {
         self.root.print(itemizer, &self.item_count, 0);
     }
-
-    fn single_path_len(&self) -> usize {
-        let mut node: &FPNode = &self.root;
-        let mut count = 0;
-        loop {
-            if node.children.len() > 1 {
-                return 0;
-            }
-            if node.children.len() == 1 {
-                node = &node.children[0];
-                count += 1;
-                continue;
-            }
-            // child has 0 children bottom of branch.
-            return count;
-        }
-    }
 }
 
 pub fn get_item_count(item: u32, item_count: &HashMap<u32, u32>) -> u32 {
