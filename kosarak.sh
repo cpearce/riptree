@@ -1,1 +1,0 @@
-cargo run --release -- --input datasets/kosarak.csv --output kosarak.rules --min-confidence 0.05 --min-lift 5 --max-support gaussian
