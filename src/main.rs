@@ -65,8 +65,8 @@ fn contains_rare_item(
 fn find_pareto_max_count(item_count: &HashMap<u32, u32>) -> u32 {
     // Sort item counts by increasing frequency
     let counts = item_count.values().cloned().sorted();
-    // max count is the count at the 80% percent mark.
-    let index = (counts.len() as f64 * 0.8).round() as usize;
+    // max count is the count at the 70% percent mark.
+    let index = (counts.len() as f64 * 0.7).round() as usize;
     counts[index]
 }
 
