@@ -20,11 +20,10 @@ use fptree::SortOrder;
 use fptree::ItemSet;
 use generate_rules::generate_rules;
 use generate_rules::Rule;
-use itertools::Itertools;
 use command_line_args::Arguments;
 use command_line_args::parse_args_or_exit;
 use command_line_args::MaxSupportMode;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -49,25 +48,43 @@ fn count_item_frequencies(
 // Returns true if transaction contains at least one rate item.
 fn contains_rare_item(
     transaction: &Vec<u32>,
-    item_count: &HashMap<u32, u32>,
-    max_count: u32,
+    rare_items: &HashSet<u32>
 ) -> bool {
-    for ref item in transaction.iter() {
-        if let Some(&count) = item_count.get(item) {
-            if count < max_count {
-                return true;
-            }
-        };
-    }
-    false
+    transaction.iter().any(|item| rare_items.contains(item))
 }
 
-fn find_pareto_max_count(item_count: &HashMap<u32, u32>) -> u32 {
-    // Sort item counts by increasing frequency
-    let counts = item_count.values().cloned().sorted();
-    // max count is the count at the 70% percent mark.
-    let index = (counts.len() as f64 * 0.7).round() as usize;
-    counts[index]
+fn find_pareto_rare_items(item_count: &HashMap<u32, u32>) -> HashSet<u32> {
+    // Sort (item, count) pairs by increasing frequency, and accumulate the
+    // total sum of the counts of all items.
+    let mut item_count_sum = 0;
+    let mut items = Vec::with_capacity(item_count.len());
+    for (&item, &count) in item_count.iter() {
+        item_count_sum += count;
+        items.push((item, count));
+    }
+    items.sort_by(|&(_, a), &(_, b)| a.cmp(&b));
+
+    let threshold = (0.25 * item_count_sum as f64) as u32;
+    let mut rare_items: HashSet<u32> = HashSet::new();
+    let mut sum = 0;
+    let mut prev_count = 0;
+    for (item, count) in items {
+        sum += count;
+        // If this item as the same count as the previous, include it.
+        // This ensures that all items of the same count are included
+        // if any are included, otherwise, the order in which items are
+        // iterated here is significant in the results, i.e. they're
+        // non-deterministic.
+        if sum < threshold || prev_count == count {
+            rare_items.insert(item);
+        }
+        if sum > threshold && prev_count != count {
+            break;
+        }
+        prev_count = count;
+    }
+
+    rare_items
 }
 
 fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
@@ -93,21 +110,18 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
     // each transaction into the tree sorted by item frequency.
     let timer = Instant::now();
     let mut fptree = FPTree::new();
-    let max_count = match args.max_support_mode {
-        MaxSupportMode::Gaussian => 0, // TODO!
-        MaxSupportMode::Pareto => find_pareto_max_count(&item_count),
+    let rare_items = match args.max_support_mode {
+        MaxSupportMode::Gaussian => HashSet::new(), // TODO!
+        MaxSupportMode::Pareto => find_pareto_rare_items(&item_count),
     };
-    println!("Calculated maximum support as {} / {}.", max_count, num_transactions);
-    if max_count == 0 {
-        eprintln!("Maximum support calculated to 0! No itemsets or rules will be generated!");
-        process::exit(1);
-    }
+    assert!(rare_items.len() > 0);
+    println!("{} of {} items are considered rare.", rare_items.len(), item_count.len());
 
     let mut index: Index = Index::new();
     for mut transaction in TransactionReader::new(&args.input_file_path, &mut itemizer) {
         index.insert(&transaction);
         // Only include transactions which contain at least one rate item.
-        if !contains_rare_item(&transaction, &item_count, max_count) {
+        if !contains_rare_item(&transaction, &rare_items) {
             continue;
         }
 
@@ -133,7 +147,7 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
     let patterns: Vec<ItemSet> = rip_growth(
         &fptree,
         &fptree,
-        max_count,
+        &rare_items,
         &vec![],
         num_transactions as u32,
         &itemizer,
