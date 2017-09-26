@@ -62,7 +62,7 @@ fn contains_rare_item(
     false
 }
 
-fn find_gaussian_max_count(item_count: &HashMap<u32, u32>) -> u32 {
+fn find_pareto_max_count(item_count: &HashMap<u32, u32>) -> u32 {
     // Sort item counts by increasing frequency
     let counts = item_count.values().cloned().sorted();
     // max count is the count at the 80% percent mark.
@@ -94,10 +94,14 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
     let timer = Instant::now();
     let mut fptree = FPTree::new();
     let max_count = match args.max_support_mode {
-        MaxSupportMode::Gaussian => find_gaussian_max_count(&item_count),
-        MaxSupportMode::Pareto => 0, // tODO!
+        MaxSupportMode::Gaussian => 0, // TODO!
+        MaxSupportMode::Pareto => find_pareto_max_count(&item_count),
     };
     println!("Calculated maximum support as {} / {}.", max_count, num_transactions);
+    if max_count == 0 {
+        eprintln!("Maximum support calculated to 0! No itemsets or rules will be generated!");
+        process::exit(1);
+    }
 
     let mut index: Index = Index::new();
     for mut transaction in TransactionReader::new(&args.input_file_path, &mut itemizer) {
