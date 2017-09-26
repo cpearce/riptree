@@ -120,7 +120,6 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
     );
 
     println!("Building lookup table for natural log/factorial...");
-    let timer = Instant::now();
     let mut ln_table = vec![];
     ln_table.push(0.0);
     ln_table.push(0.0);
@@ -128,7 +127,6 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
         let prev = ln_table[i-1];
         ln_table.push(prev + (i as f64).ln());
     }
-    println!("Done in {} seconds.", timer.elapsed().as_secs());
 
     println!("Starting recursive FPGrowth...");
     let timer = Instant::now();
