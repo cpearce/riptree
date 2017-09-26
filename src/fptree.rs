@@ -284,13 +284,13 @@ pub fn rip_growth(
     // threshold. Sort the list in increasing order of frequency.
     let mut items: Vec<u32> = item_index
         .keys()
-        .map(|x| *x)
+        .map(|x| x.clone())
         .filter(|x| get_item_count(*x, fptree.item_count()) < max_count)
         .collect();
     sort_transaction(&mut items, fptree.item_count(), SortOrder::Increasing);
 
-    let mut items: Vec<u32> = items.iter()
-        .map(|x| *x)
+    let items: Vec<u32> = items.iter()
+        .map(|x| x.clone())
         .filter(|item| {
             if path.len() == 0 {
                 return true;
