@@ -56,26 +56,6 @@ fn union(a: &Vec<u32>, b: &Vec<u32>) -> Vec<u32> {
     c
 }
 
-// Assumes both itemsets are sorted.
-fn intersection(a: &Vec<u32>, b: &Vec<u32>) -> Vec<u32> {
-    let mut c: Vec<u32> = Vec::new();
-    let mut ap = 0;
-    let mut bp = 0;
-    while ap < a.len() && bp < b.len() {
-        if a[ap] < b[bp] {
-            ap += 1;
-        } else if b[bp] < a[ap] {
-            bp += 1;
-        } else {
-            // a[ap] == b[bp]
-            c.push(a[ap]);
-            ap += 1;
-            bp += 1;
-        }
-    }
-    c
-}
-
 // If all items in the itemset convert to an integer, order by that integer,
 // otherwise order lexicographically.
 fn ensure_sorted(a: &mut Vec<String>) {
@@ -164,30 +144,6 @@ impl Rule {
         })
     }
 
-    // Creates a new Rule with:
-    //  - the antecedent is the union of both rules' antecedents, and
-    //  - the consequent is the intersection of both rules' consequents,
-    // provided the new rule would be would be above the min_confidence threshold.
-    fn merge(
-        a: &Rule,
-        b: &Rule,
-        itemset_support: &HashMap<Vec<u32>, f64>,
-        min_confidence: f64,
-        min_lift: f64,
-    ) -> Option<Rule> {
-        // let antecedent = union(&a.antecedent, &b.antecedent);
-        // let consequent = intersection(&a.consequent, &b.consequent);
-        let antecedent = intersection(&a.antecedent, &b.antecedent);
-        let consequent = union(&a.consequent, &b.consequent);
-        Rule::make(
-            antecedent,
-            consequent,
-            itemset_support,
-            min_confidence,
-            min_lift,
-        )
-    }
-
     pub fn confidence(&self) -> f64 {
         self.confidence.into()
     }
@@ -198,10 +154,6 @@ impl Rule {
 
     pub fn support(&self) -> f64 {
         self.support.into()
-    }
-
-    pub fn union_size(&self) -> usize {
-        self.antecedent.len() + self.consequent.len()
     }
 }
 
