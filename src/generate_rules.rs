@@ -205,6 +205,8 @@ pub fn generate_rules(
     index: &Index,
     ln_table: &[f64],
     item_count: &HashMap<u32, u32>,
+    disable_family_wise_rule_filtering: bool,
+    disable_permutation_rule_filtering: bool,
 ) -> HashSet<Rule> {
     // Create a lookup of itemset to support, so we can quickly determine
     // an itemset's support during rule generation.
@@ -255,69 +257,79 @@ pub fn generate_rules(
         all_rare_rules.len()
     );
 
-    // Family-Wise with Bonfronni correction.
-    // Count number of rules generated with the same consequent.
-    let mut rule_counts: HashMap<u32, u32> = HashMap::new();
-    for rule in all_rare_rules.iter() {
-        assert_eq!(rule.consequent.len(), 1);
-        *rule_counts.entry(rule.consequent[0]).or_insert(0) += 1;
+    let mut rule_p_values: HashMap<Rule, f64> = HashMap::new();
+    let family_wise_filtered_rules: HashSet<Rule>;
+    if !disable_family_wise_rule_filtering {
+        // Family-Wise with Bonfronni correction.
+        // Count number of rules generated with the same consequent.
+        let mut rule_counts: HashMap<u32, u32> = HashMap::new();
+        for rule in all_rare_rules.iter() {
+            assert_eq!(rule.consequent.len(), 1);
+            *rule_counts.entry(rule.consequent[0]).or_insert(0) += 1;
+        }
+
+        // For each rule, calculate the p-value for association between antecedent
+        // and consequent, and keep those with p-value less than significance
+        // divided by the number of rules with the same consequent.
+        family_wise_filtered_rules = all_rare_rules
+            .into_iter()
+            .filter(|rule| {
+                let a = index.count(&rule.antecedent) as u32;
+                let b = index.count(&rule.consequent) as u32;
+                let both = union(&rule.antecedent, &rule.consequent);
+                let ab = index.count(&both) as u32;
+                let n = index.num_transactions() as u32;
+                let pv = pval(ab, a, b, n, ln_table);
+                rule_p_values.insert(rule.clone(), pv);
+                let threshold = 0.05 / (rule_counts[&rule.consequent[0]] as f64);
+                pv < threshold
+            })
+            .collect();
+
+        println!(
+            "After family wise filtering, {} rules remain",
+            family_wise_filtered_rules.len()
+        );
+    } else {
+        family_wise_filtered_rules = all_rare_rules;
     }
 
-    // For each rule, calculate the p-value for association between antecedent
-    // and consequent, and keep those with p-value less than significance
-    // divided by the number of rules with the same consequent.
-    let mut rule_p_values: HashMap<Rule, f64> = HashMap::new();
-    let family_wise_filtered_rules: HashSet<Rule> = all_rare_rules
-        .into_iter()
-        .filter(|rule| {
-            let a = index.count(&rule.antecedent) as u32;
-            let b = index.count(&rule.consequent) as u32;
-            let both = union(&rule.antecedent, &rule.consequent);
-            let ab = index.count(&both) as u32;
-            let n = index.num_transactions() as u32;
-            let pv = pval(ab, a, b, n, ln_table);
-            rule_p_values.insert(rule.clone(), pv);
-            let threshold = 0.05 / (rule_counts[&rule.consequent[0]] as f64);
-            pv < threshold
-        })
-        .collect();
+    let rules: HashSet<Rule>;
+    if !disable_permutation_rule_filtering {
+        // Permutation testing; generate 100 random datasets.
+        let min_pvals: Vec<OrderedFloat<f64>> = (0..100)
+            .into_iter()
+            .map(|_| {
+                let random_index = generate_random_dataset(item_count, index.num_transactions());
 
-    println!(
-        "After family wise filtering, {} rules remain",
-        family_wise_filtered_rules.len()
-    );
+                // Find the lowest p-value of all rules as they appear in this random dataset.
+                family_wise_filtered_rules
+                    .iter()
+                    .map(|rule| {
+                        let a = random_index.count(&rule.antecedent) as u32;
+                        let b = random_index.count(&rule.consequent) as u32;
+                        let both = union(&rule.antecedent, &rule.consequent);
+                        let ab = random_index.count(&both) as u32;
+                        let n = random_index.num_transactions() as u32;
+                        OrderedFloat::from(pval(ab, a, b, n, ln_table))
+                    })
+                    .min()
+                    .unwrap()
+            })
+            .sorted();
 
-    // Permutation testing; generate 100 random datasets.
-    let min_pvals: Vec<OrderedFloat<f64>> = (0..100)
-        .into_iter()
-        .map(|_| {
-            let random_index = generate_random_dataset(item_count, index.num_transactions());
+        let threshold = min_pvals[(min_pvals.len() as f64 * 0.05) as usize].into_inner();
+        println!("Permutation threshold is {}", threshold);
 
-            // Find the lowest p-value of all rules as they appear in this random dataset.
-            family_wise_filtered_rules
-                .iter()
-                .map(|rule| {
-                    let a = random_index.count(&rule.antecedent) as u32;
-                    let b = random_index.count(&rule.consequent) as u32;
-                    let both = union(&rule.antecedent, &rule.consequent);
-                    let ab = random_index.count(&both) as u32;
-                    let n = random_index.num_transactions() as u32;
-                    OrderedFloat::from(pval(ab, a, b, n, ln_table))
-                })
-                .min()
-                .unwrap()
-        })
-        .sorted();
+        rules = family_wise_filtered_rules
+            .into_iter()
+            .filter(|ref rule| rule_p_values[rule] < threshold)
+            .collect();
 
-    let threshold = min_pvals[(min_pvals.len() as f64 * 0.05) as usize].into_inner();
-    println!("Permutation threshold is {}", threshold);
-
-    let rules: HashSet<Rule> = family_wise_filtered_rules
-        .into_iter()
-        .filter(|ref rule| rule_p_values[rule] < threshold)
-        .collect();
-
-    println!("After permutation testing, {} rules remain.", rules.len());
+        println!("After permutation testing, {} rules remain.", rules.len());
+    } else {
+        rules = family_wise_filtered_rules; 
+    }
 
     rules
 }
