@@ -72,8 +72,9 @@ fn find_gaussian_rare_items(
         (2.0 * num_transactions as f64))
         .sqrt();
 
-    // Generate 30 randomly distributed datasets in parallel.
-    let random_datasets: Vec<HashMap<u32, u32>> = (0..30)
+    // Generate 30 randomly distributed datasets in parallel,
+    // and reduce into the minimum count of each item over all datasets.
+    let min_count: HashMap<u32, u32> = (0..30)
         .into_par_iter()
         .map(|_| {
             let mut rng = rand::thread_rng();
@@ -86,16 +87,13 @@ fn find_gaussian_rare_items(
             }
             random_dataset
         })
-        .collect();
-
-    // Find the minimum count over all random datasets.
-    let mut min_count: HashMap<u32, u32> = HashMap::new();
-    for random_dataset in random_datasets {
-        for (item, count) in random_dataset.iter() {
-            let p = min_count.entry(*item).or_insert(*count);
-            *p = min(*p, *count);
-        }
-    }
+        .reduce(HashMap::new, |mut min_count, random_dataset| {
+            for (item, count) in random_dataset.iter() {
+                let p = min_count.entry(*item).or_insert(*count);
+                *p = min(*p, *count);
+            }
+            min_count
+        });
 
     // See if the count in the actual dataset is significantly different from
     // the random datasets.
