@@ -72,9 +72,9 @@ fn find_gaussian_rare_items(
         (2.0 * num_transactions as f64))
         .sqrt();
 
-    // Generate 30 randomly distributed datasets in parallel,
+    // Generate 100 randomly distributed datasets in parallel,
     // and reduce into the minimum count of each item over all datasets.
-    let min_count: HashMap<u32, u32> = (0..30)
+    let min_count: HashMap<u32, u32> = (0..100)
         .into_par_iter()
         .map(|_| {
             let mut rng = rand::thread_rng();
