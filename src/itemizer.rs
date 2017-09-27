@@ -22,13 +22,16 @@ impl Itemizer {
         self.next_item_id += 1;
         self.item_str_to_id.insert(String::from(item), id);
         self.item_id_to_str.insert(id, String::from(item));
-        return id;
+        id
     }
     pub fn str_of(&self, id: u32) -> String {
         match self.item_id_to_str.get(&id) {
             Some(s) => s.clone(),
             _ => String::from("Unknown"),
         }
+    }
+    pub fn max_item_id(&self) -> u32 {
+        self.next_item_id - 1
     }
     #[cfg(test)]
     pub fn to_id_vec(&mut self, vec_of_str: &[&str]) -> Vec<u32> {

@@ -1,6 +1,7 @@
 extern crate argparse;
 extern crate itertools;
 extern crate ordered_float;
+extern crate rand;
 extern crate rayon;
 
 mod itemizer;
@@ -23,6 +24,8 @@ use generate_rules::Rule;
 use command_line_args::Arguments;
 use command_line_args::parse_args_or_exit;
 use command_line_args::MaxSupportMode;
+use rand::Rng;
+use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
@@ -46,11 +49,53 @@ fn count_item_frequencies(
 }
 
 // Returns true if transaction contains at least one rate item.
-fn contains_rare_item(
-    transaction: &Vec<u32>,
-    rare_items: &HashSet<u32>
-) -> bool {
+fn contains_rare_item(transaction: &Vec<u32>, rare_items: &HashSet<u32>) -> bool {
     transaction.iter().any(|item| rare_items.contains(item))
+}
+
+fn find_gaussian_rare_items(
+    item_count: &HashMap<u32, u32>,
+    num_transactions: usize,
+    max_item_id: u32,
+) -> HashSet<u32> {
+    let avg_transaction_len = (item_count.iter().fold(0, |acc, (_, count)| acc + count) as f64 /
+        num_transactions as f64)
+        .ceil() as u32;
+
+    let max_item_count = item_count
+        .iter()
+        .fold(0, |acc, (_, count)| max(acc, *count));
+
+    let delta = 0.05;
+    let epsilon = ((max_item_count as f64).powi(2) * (1.0_f64 / delta).ln() /
+        (2.0 * num_transactions as f64))
+        .sqrt();
+
+    let mut min_count: HashMap<u32, u32> = HashMap::new();
+    let mut rng = rand::thread_rng();
+    for _ in 0..30 {
+        let mut random_dataset = HashMap::new();
+        for _ in 0..num_transactions {
+            for _ in 0..avg_transaction_len {
+                let random_item = rng.gen_range(0, max_item_id + 1);
+                *random_dataset.entry(random_item).or_insert(0) += 1;
+            }
+        }
+        for (item, count) in random_dataset.iter() {
+            let p = min_count.entry(*item).or_insert(*count);
+            *p = min(*p, *count);
+        }
+    }
+
+    let mut rare_items: HashSet<u32> = HashSet::new();
+    for (item, count) in item_count.iter() {
+        let random_min_count = min_count[item] as f64;
+        if (random_min_count - (*count as f64)) > epsilon {
+            rare_items.insert(*item);
+        }
+    }
+
+    rare_items
 }
 
 fn find_pareto_rare_items(item_count: &HashMap<u32, u32>) -> HashSet<u32> {
@@ -111,11 +156,17 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
     let timer = Instant::now();
     let mut fptree = FPTree::new();
     let rare_items = match args.max_support_mode {
-        MaxSupportMode::Gaussian => HashSet::new(), // TODO!
+        MaxSupportMode::Gaussian => {
+            find_gaussian_rare_items(&item_count, num_transactions, itemizer.max_item_id())
+        }
         MaxSupportMode::Pareto => find_pareto_rare_items(&item_count),
     };
     assert!(rare_items.len() > 0);
-    println!("{} of {} items are considered rare.", rare_items.len(), item_count.len());
+    println!(
+        "{} of {} items are considered rare.",
+        rare_items.len(),
+        item_count.len()
+    );
 
     let mut index: Index = Index::new();
     for mut transaction in TransactionReader::new(&args.input_file_path, &mut itemizer) {
@@ -138,7 +189,7 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
     ln_table.push(0.0);
     ln_table.push(0.0);
     for i in 2..num_transactions + 1 {
-        let prev = ln_table[i-1];
+        let prev = ln_table[i - 1];
         ln_table.push(prev + (i as f64).ln());
     }
 
