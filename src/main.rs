@@ -232,7 +232,7 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
         &rare_items,
         &index,
         &ln_table,
-        &itemizer,
+        &item_count,
     ).iter()
         .cloned()
         .collect();

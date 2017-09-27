@@ -1,8 +1,11 @@
+extern crate rand;
+
 use index::Index;
 use itemizer::Itemizer;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use rayon::prelude::*;
+use rand::Rng;
 use std::collections::HashSet;
 use std::collections::HashMap;
 use fptree::ItemSet;
@@ -208,6 +211,39 @@ pub fn split_out_item(items: &Vec<u32>, item: u32) -> (Vec<u32>, Vec<u32>) {
     (antecedent, consequent)
 }
 
+fn generate_random_dataset(item_count: &HashMap<u32, u32>, num_transactions: usize) -> Index {
+    let mut total_item_count = item_count.iter().fold(0, |acc, (_, count)| acc + count);
+    let avg_transaction_len = (total_item_count as f64 / num_transactions as f64).ceil() as u32;
+    let mut items_remaining: Vec<(u32, u32)> = item_count
+        .iter()
+        .map(|(&item, &count)| (item, count))
+        .collect();
+
+    let mut index = Index::new();
+    // Generate the same number of transactions...
+    for _ in 0..num_transactions {
+        let mut transaction: Vec<u32> = vec![];
+        let mut rng = rand::thread_rng();
+        // Generate a random transaction of the same length...
+        for _ in 0..avg_transaction_len {
+            if total_item_count == 0 {
+                break;
+            }
+            let mut n = rng.gen_range(0, total_item_count);
+            let mut i = 0;
+            while n >= items_remaining[i].1 {
+                n -= items_remaining[i].1;
+                i += 1;
+            }
+            items_remaining[i].1 -= 1;
+            total_item_count -= 1;
+            transaction.push(items_remaining[i].0);
+        }
+        index.insert(&transaction);
+    }
+    index
+}
+
 pub fn generate_rules(
     itemsets: &Vec<ItemSet>,
     dataset_size: u32,
@@ -216,7 +252,7 @@ pub fn generate_rules(
     rare_items: &HashSet<u32>,
     index: &Index,
     ln_table: &[f64],
-    itemizer: &Itemizer,
+    item_count: &HashMap<u32, u32>,
 ) -> HashSet<Rule> {
     // Create a lookup of itemset to support, so we can quickly determine
     // an itemset's support during rule generation.
@@ -262,6 +298,11 @@ pub fn generate_rules(
             accum
         });
 
+    println!(
+        "Generated {} unfiltered rules, filtering via FW+BC",
+        all_rare_rules.len()
+    );
+
     // Family-Wise with Bonfronni correction.
     // Count number of rules generated with the same consequent.
     let mut rule_counts: HashMap<u32, u32> = HashMap::new();
@@ -273,7 +314,8 @@ pub fn generate_rules(
     // For each rule, calculate the p-value for association between antecedent
     // and consequent, and keep those with p-value less than significance
     // divided by the number of rules with the same consequent.
-    let family_wise_filtered_rules = all_rare_rules
+    let mut rule_p_values: HashMap<Rule, f64> = HashMap::new();
+    let family_wise_filtered_rules: HashSet<Rule> = all_rare_rules
         .into_iter()
         .filter(|rule| {
             let a = index.count(&rule.antecedent) as u32;
@@ -282,15 +324,50 @@ pub fn generate_rules(
             let ab = index.count(&both) as u32;
             let n = index.num_transactions() as u32;
             let pv = pval(ab, a, b, n, ln_table);
+            rule_p_values.insert(rule.clone(), pv);
             let threshold = 0.05 / (rule_counts[&rule.consequent[0]] as f64);
             pv < threshold
         })
         .collect();
 
+    println!(
+        "After family wise filtering, {} rules remain",
+        family_wise_filtered_rules.len()
+    );
 
+    // Permutation testing; generate 100 random datasets.
+    let min_pvals: Vec<OrderedFloat<f64>> = (0..100)
+        .into_iter()
+        .map(|_| {
+            let random_index = generate_random_dataset(item_count, index.num_transactions());
 
+            // Find the lowest p-value of all rules as they appear in this random dataset.
+            family_wise_filtered_rules
+                .iter()
+                .map(|rule| {
+                    let a = random_index.count(&rule.antecedent) as u32;
+                    let b = random_index.count(&rule.consequent) as u32;
+                    let both = union(&rule.antecedent, &rule.consequent);
+                    let ab = random_index.count(&both) as u32;
+                    let n = random_index.num_transactions() as u32;
+                    OrderedFloat::from(pval(ab, a, b, n, ln_table))
+                })
+                .min()
+                .unwrap()
+        })
+        .sorted();
 
-    family_wise_filtered_rules
+    let threshold = min_pvals[(min_pvals.len() as f64 * 0.05) as usize].into_inner();
+    println!("Permutation threshold is {}", threshold);
+
+    let rules: HashSet<Rule> = family_wise_filtered_rules
+        .into_iter()
+        .filter(|ref rule| rule_p_values[rule] < threshold)
+        .collect();
+
+    println!("After permutation testing, {} rules remain.", rules.len());
+
+    rules
 }
 
 #[cfg(test)]
