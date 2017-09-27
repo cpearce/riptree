@@ -251,15 +251,11 @@ fn lfactorial(n: u32, ln_table: &[f64]) -> f64 {
 }
 
 fn pval(ab: u32, a: u32, b: u32, n: u32, ln_table: &[f64]) -> f64 {
-  (lfactorial(b, ln_table)
-    + lfactorial(n - b, ln_table)
-    + lfactorial(a, ln_table)
-    + lfactorial(n - a, ln_table)
-    - lfactorial(ab, ln_table)
-    - lfactorial(b - ab, ln_table)
-    - lfactorial(a - ab, ln_table)
-    - lfactorial(n - a - b + ab, ln_table)
-    - lfactorial(n, ln_table)).exp()
+    (lfactorial(b, ln_table) + lfactorial(n - b, ln_table) + lfactorial(a, ln_table) +
+        lfactorial(n - a, ln_table) - lfactorial(ab, ln_table) - lfactorial(b - ab, ln_table) -
+        lfactorial(a - ab, ln_table) - lfactorial(n - a - b + ab, ln_table) -
+        lfactorial(n, ln_table))
+        .exp()
 }
 
 pub fn rip_growth(
@@ -289,7 +285,8 @@ pub fn rip_growth(
         .collect();
     sort_transaction(&mut items, fptree.item_count(), SortOrder::Increasing);
 
-    let items: Vec<u32> = items.iter()
+    let items: Vec<u32> = items
+        .iter()
         .map(|x| x.clone())
         .filter(|item| {
             if path.len() == 0 {
@@ -309,7 +306,6 @@ pub fn rip_growth(
     let x: Vec<ItemSet> = items
         .par_iter()
         .flat_map(|item| -> Vec<ItemSet> {
-
             // The path to here plus this item must be below the maximum
             // support threshold.
             let mut itemset: Vec<u32> = Vec::from(path);

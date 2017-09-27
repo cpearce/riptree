@@ -67,7 +67,7 @@ impl Index {
             }
         }
 
-        count        
+        count
     }
 
     #[allow(dead_code)]
