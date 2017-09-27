@@ -1,3 +1,4 @@
+use index::Index;
 use itemizer::Itemizer;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
@@ -5,6 +6,7 @@ use rayon::prelude::*;
 use std::collections::HashSet;
 use std::collections::HashMap;
 use fptree::ItemSet;
+use fptree::pval;
 
 #[derive(Clone, Hash, Eq, Debug)]
 pub struct Rule {
@@ -211,6 +213,10 @@ pub fn generate_rules(
     dataset_size: u32,
     min_confidence: f64,
     min_lift: f64,
+    rare_items: &HashSet<u32>,
+    index: &Index,
+    ln_table: &[f64],
+    itemizer: &Itemizer,
 ) -> HashSet<Rule> {
     // Create a lookup of itemset to support, so we can quickly determine
     // an itemset's support during rule generation.
@@ -219,14 +225,19 @@ pub fn generate_rules(
         itemset_support.insert(i.items.clone(), i.count as f64 / dataset_size as f64);
     }
 
-    let rv: Vec<HashSet<Rule>> = itemsets
+    // Rare rules are those with the consequent as a single rare item. Generate
+    // those by splitting out each rare item out from every itemset.
+    let all_rare_rules: HashSet<Rule> = itemsets
         .par_iter()
         .filter(|i| i.items.len() > 1)
         .map(|ref itemset| {
             let mut rules: HashSet<Rule> = HashSet::new();
             let mut candidates: Vec<Rule> = Vec::new();
-            // First level candidates are all the rules with consequents of size 1.
-            for &item in itemset.items.iter() {
+            for &item in itemset
+                .items
+                .iter()
+                .filter(|item| rare_items.contains(&item))
+            {
                 let (antecedent, consequent) = split_out_item(&itemset.items, item);
                 if let Some(rule) = Rule::make(
                     antecedent,
@@ -242,45 +253,44 @@ pub fn generate_rules(
                     rules.insert(rule);
                 }
             }
-
-            while !candidates.is_empty() {
-                // Subsequent level candidates have their antecedents as the
-                // intersection and the consequent as the union of two parent
-                // rules.
-                let mut next_candidates = vec![];
-                for (candidate, other) in candidates.iter().tuple_combinations() {
-                    assert_eq!(candidate.union_size(), other.union_size());
-                    if let Some(rule) = Rule::merge(
-                        &candidate,
-                        &other,
-                        &itemset_support,
-                        min_confidence,
-                        min_lift,
-                    ) {
-                        if !rules.contains(&rule) {
-                            rules.insert(rule.clone());
-                            next_candidates.push(rule);
-                        }
-                    }
-                }
-                // Copy the current generation into the candidates list, so that we
-                // use it to calculate the next generation.
-                candidates = next_candidates.iter().cloned().collect();
-
-                next_candidates.clear();
-            }
             rules
+        })
+        .reduce(HashSet::new, |mut accum, rules| {
+            for rule in rules.into_iter() {
+                accum.insert(rule);
+            }
+            accum
+        });
+
+    // Family-Wise with Bonfronni correction.
+    // Count number of rules generated with the same consequent.
+    let mut rule_counts: HashMap<u32, u32> = HashMap::new();
+    for rule in all_rare_rules.iter() {
+        assert_eq!(rule.consequent.len(), 1);
+        *rule_counts.entry(rule.consequent[0]).or_insert(0) += 1;
+    }
+
+    // For each rule, calculate the p-value for association between antecedent
+    // and consequent, and keep those with p-value less than significance
+    // divided by the number of rules with the same consequent.
+    let family_wise_filtered_rules = all_rare_rules
+        .into_iter()
+        .filter(|rule| {
+            let a = index.count(&rule.antecedent) as u32;
+            let b = index.count(&rule.consequent) as u32;
+            let both = union(&rule.antecedent, &rule.consequent);
+            let ab = index.count(&both) as u32;
+            let n = index.num_transactions() as u32;
+            let pv = pval(ab, a, b, n, ln_table);
+            let threshold = 0.05 / (rule_counts[&rule.consequent[0]] as f64);
+            pv < threshold
         })
         .collect();
 
-    let mut rules: HashSet<Rule> = HashSet::new();
-    for set in rv.into_iter() {
-        for rule in set {
-            rules.insert(rule);
-        }
-    }
 
-    rules
+
+
+    family_wise_filtered_rules
 }
 
 #[cfg(test)]

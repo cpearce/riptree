@@ -229,6 +229,10 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
         num_transactions as u32,
         args.min_confidence,
         args.min_lift,
+        &rare_items,
+        &index,
+        &ln_table,
+        &itemizer,
     ).iter()
         .cloned()
         .collect();

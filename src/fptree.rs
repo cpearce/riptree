@@ -250,7 +250,7 @@ fn lfactorial(n: u32, ln_table: &[f64]) -> f64 {
     ln_table[n as usize]
 }
 
-fn pval(ab: u32, a: u32, b: u32, n: u32, ln_table: &[f64]) -> f64 {
+pub fn pval(ab: u32, a: u32, b: u32, n: u32, ln_table: &[f64]) -> f64 {
     (lfactorial(b, ln_table) + lfactorial(n - b, ln_table) + lfactorial(a, ln_table) +
         lfactorial(n - a, ln_table) - lfactorial(ab, ln_table) - lfactorial(b - ab, ln_table) -
         lfactorial(a - ab, ln_table) - lfactorial(n - a - b + ab, ln_table) -
