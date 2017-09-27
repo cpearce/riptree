@@ -25,6 +25,7 @@ use command_line_args::Arguments;
 use command_line_args::parse_args_or_exit;
 use command_line_args::MaxSupportMode;
 use rand::Rng;
+use rayon::prelude::*;
 use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -71,22 +72,33 @@ fn find_gaussian_rare_items(
         (2.0 * num_transactions as f64))
         .sqrt();
 
-    let mut min_count: HashMap<u32, u32> = HashMap::new();
-    let mut rng = rand::thread_rng();
-    for _ in 0..30 {
-        let mut random_dataset = HashMap::new();
-        for _ in 0..num_transactions {
-            for _ in 0..avg_transaction_len {
-                let random_item = rng.gen_range(0, max_item_id + 1);
-                *random_dataset.entry(random_item).or_insert(0) += 1;
+    // Generate 30 randomly distributed datasets in parallel.
+    let random_datasets: Vec<HashMap<u32, u32>> = (0..30)
+        .into_par_iter()
+        .map(|_| {
+            let mut rng = rand::thread_rng();
+            let mut random_dataset = HashMap::new();
+            for _ in 0..num_transactions {
+                for _ in 0..avg_transaction_len {
+                    let random_item = rng.gen_range(0, max_item_id + 1);
+                    *random_dataset.entry(random_item).or_insert(0) += 1;
+                }
             }
-        }
+            random_dataset
+        })
+        .collect();
+
+    // Find the minimum count over all random datasets.
+    let mut min_count: HashMap<u32, u32> = HashMap::new();
+    for random_dataset in random_datasets {
         for (item, count) in random_dataset.iter() {
             let p = min_count.entry(*item).or_insert(*count);
             *p = min(*p, *count);
         }
     }
 
+    // See if the count in the actual dataset is significantly different from
+    // the random datasets.
     let mut rare_items: HashSet<u32> = HashSet::new();
     for (item, count) in item_count.iter() {
         let random_min_count = min_count[item] as f64;
