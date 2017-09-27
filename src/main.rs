@@ -208,7 +208,7 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
     let patterns: Vec<ItemSet> = rip_growth(
         &fptree,
         &fptree,
-        &rare_items,
+        Some(&rare_items),
         &vec![],
         num_transactions as u32,
         &itemizer,

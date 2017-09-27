@@ -261,7 +261,7 @@ fn pval(ab: u32, a: u32, b: u32, n: u32, ln_table: &[f64]) -> f64 {
 pub fn rip_growth(
     initial_tree: &FPTree,
     fptree: &FPTree,
-    rare_items: &HashSet<u32>,
+    rare_items: Option<&HashSet<u32>>,
     path: &[u32],
     path_count: u32,
     itemizer: &Itemizer,
@@ -276,13 +276,18 @@ pub fn rip_growth(
     // Maps item id to vec of &FPNode's for those items.
     let item_index = make_item_index(&fptree);
 
-    // Get list of items in the tree which are rare.
-    // Sort the list in increasing order of frequency.
-    let mut items: Vec<u32> = item_index
-        .keys()
-        .map(|x| x.clone())
-        .filter(|x| rare_items.contains(x))
-        .collect();
+    // Sort the list in increasing order of frequency. On the first
+    // iteration, we also filter out the non-rare items. On subsequent
+    // recursions, we recurse on all items (frequent and rare) to ensure
+    // we can find associations between rare items with frequent items.
+    let mut items: Vec<u32> = match rare_items {
+        Some(rare_items) => item_index
+            .keys()
+            .map(|item| item.clone())
+            .filter(|item| rare_items.contains(item))
+            .collect(),
+        None => item_index.keys().map(|item| item.clone()).collect(),
+    };
     sort_transaction(&mut items, fptree.item_count(), SortOrder::Increasing);
 
     let items: Vec<u32> = items
@@ -318,7 +323,7 @@ pub fn rip_growth(
                 let mut y = rip_growth(
                     initial_tree,
                     &conditional_tree,
-                    rare_items,
+                    None,
                     &itemset,
                     new_path_count,
                     itemizer,
