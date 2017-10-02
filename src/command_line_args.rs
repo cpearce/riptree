@@ -16,7 +16,6 @@ pub struct Arguments {
     pub min_confidence: f64,
     pub min_lift: f64,
     pub disable_family_wise_rule_filtering: bool,
-    pub disable_permutation_rule_filtering: bool,
 }
 
 pub fn parse_args_or_exit() -> Arguments {
@@ -27,7 +26,6 @@ pub fn parse_args_or_exit() -> Arguments {
         min_confidence: 0.0,
         min_lift: 0.0,
         disable_family_wise_rule_filtering: false,
-        disable_permutation_rule_filtering: false,
     };
 
     let mut max_support_mode: String = String::new();
@@ -87,15 +85,6 @@ pub fn parse_args_or_exit() -> Arguments {
                 StoreTrue,
                 "Disables family-wise with Bonfronni Correction rule filtering.",
             );
-
-        parser
-            .refer(&mut args.disable_permutation_rule_filtering)
-            .add_option(
-                &["--disable-permutation-rule-filtering"],
-                StoreTrue,
-                "Disables permutation testing based rule filtering.",
-            );
-
 
         if env::args().count() == 1 {
             parser.print_help("Usage:", &mut io::stderr()).unwrap();

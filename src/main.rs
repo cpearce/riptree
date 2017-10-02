@@ -234,7 +234,6 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
         &ln_table,
         &item_count,
         args.disable_family_wise_rule_filtering,
-        args.disable_permutation_rule_filtering,
     ).iter()
         .cloned()
         .collect();

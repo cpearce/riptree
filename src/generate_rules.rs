@@ -206,7 +206,6 @@ pub fn generate_rules(
     ln_table: &[f64],
     item_count: &HashMap<u32, u32>,
     disable_family_wise_rule_filtering: bool,
-    disable_permutation_rule_filtering: bool,
 ) -> HashSet<Rule> {
     // Create a lookup of itemset to support, so we can quickly determine
     // an itemset's support during rule generation.
@@ -294,44 +293,7 @@ pub fn generate_rules(
         family_wise_filtered_rules = all_rare_rules;
     }
 
-    let rules: HashSet<Rule>;
-    if !disable_permutation_rule_filtering {
-        // Permutation testing; generate 100 random datasets.
-        let min_pvals: Vec<OrderedFloat<f64>> = (0..100)
-            .into_iter()
-            .map(|_| {
-                let random_index = generate_random_dataset(item_count, index.num_transactions());
-
-                // Find the lowest p-value of all rules as they appear in this random dataset.
-                family_wise_filtered_rules
-                    .iter()
-                    .map(|rule| {
-                        let a = random_index.count(&rule.antecedent) as u32;
-                        let b = random_index.count(&rule.consequent) as u32;
-                        let both = union(&rule.antecedent, &rule.consequent);
-                        let ab = random_index.count(&both) as u32;
-                        let n = random_index.num_transactions() as u32;
-                        OrderedFloat::from(pval(ab, a, b, n, ln_table))
-                    })
-                    .min()
-                    .unwrap()
-            })
-            .sorted();
-
-        let threshold = min_pvals[(min_pvals.len() as f64 * 0.05) as usize].into_inner();
-        println!("Permutation threshold is {}", threshold);
-
-        rules = family_wise_filtered_rules
-            .into_iter()
-            .filter(|ref rule| rule_p_values[rule] < threshold)
-            .collect();
-
-        println!("After permutation testing, {} rules remain.", rules.len());
-    } else {
-        rules = family_wise_filtered_rules; 
-    }
-
-    rules
+    family_wise_filtered_rules
 }
 
 #[cfg(test)]
