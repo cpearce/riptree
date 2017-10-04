@@ -74,7 +74,7 @@ fn find_gaussian_rare_items(
 
     // Generate 100 randomly distributed datasets in parallel,
     // and reduce into the minimum count of each item over all datasets.
-    let min_count: HashMap<u32, u32> = (0..100)
+    let min_count: HashMap<u32, u32> = (0..1000)
         .into_par_iter()
         .map(|_| {
             let mut rng = rand::thread_rng();
