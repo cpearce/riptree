@@ -145,18 +145,22 @@ fn find_pareto_rare_items(item_count: &HashMap<u32, u32>) -> HashSet<u32> {
 fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
     println!("Mining data set: {}", args.input_file_path);
     println!("Output rules file: {}", args.output_rules_path);
-    println!("Max support mode: {}",
+    println!(
+        "Max support mode: {}",
         match args.max_support_mode {
             MaxSupportMode::Pareto => "Pareto",
             MaxSupportMode::Gaussian => "Gaussian",
-        });
+        }
+    );
     println!("Minimum confidence: {}", args.min_confidence);
     println!("Minimum lift: {}", args.min_lift);
-    println!("Family Wise with Bonferonni correction rule filtering: {}",
+    println!(
+        "Family Wise with Bonferonni correction rule filtering: {}",
         match args.disable_family_wise_rule_filtering {
             true => "Disabled",
             false => "Enabled",
-        });
+        }
+    );
 
     println!("Making first pass of dataset to count item frequencies...");
     // Make one pass of the dataset to calculate the item frequencies
