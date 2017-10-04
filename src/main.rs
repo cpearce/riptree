@@ -192,6 +192,13 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
         item_count.len()
     );
 
+    if args.log_rare_items {
+        println!("Rare items:");
+        for &item in rare_items.iter() {
+            println!("{}", itemizer.str_of(item));
+        }
+    }
+
     let mut index: Index = Index::new();
     for mut transaction in TransactionReader::new(&args.input_file_path, &mut itemizer) {
         index.insert(&transaction);
