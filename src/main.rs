@@ -177,12 +177,10 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
         num_transactions
     );
 
-    println!("Building initial RIPTree based on item frequencies...");
-
     // Load the initial tree, by re-reading the data set and inserting
     // each transaction into the tree sorted by item frequency.
     let timer = Instant::now();
-    let mut fptree = FPTree::new();
+    println!("Finding rare items...");
     let rare_items = match args.max_support_mode {
         MaxSupportMode::Gaussian => {
             find_gaussian_rare_items(&item_count, num_transactions, itemizer.max_item_id())
@@ -191,9 +189,10 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
     };
     assert!(rare_items.len() > 0);
     println!(
-        "{} of {} items are considered rare.",
+        "{} of {} items are considered rare, took {} seconds.",
         rare_items.len(),
-        item_count.len()
+        item_count.len(),
+        timer.elapsed().as_secs(),
     );
 
     if args.log_rare_items {
@@ -203,6 +202,9 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
         }
     }
 
+    let timer = Instant::now();
+    let mut fptree = FPTree::new();
+    println!("Building initial RIPTree based on item frequencies...");
     let mut index: Index = Index::new();
     for mut transaction in TransactionReader::new(&args.input_file_path, &mut itemizer) {
         index.insert(&transaction);
