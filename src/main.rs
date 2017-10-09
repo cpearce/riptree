@@ -268,7 +268,6 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
         &rare_items,
         &index,
         &ln_table,
-        &item_count,
         args.disable_family_wise_rule_filtering,
     ).iter()
         .cloned()

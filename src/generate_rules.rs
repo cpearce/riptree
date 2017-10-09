@@ -1,11 +1,8 @@
-extern crate rand;
-
 use index::Index;
 use itemizer::Itemizer;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use rayon::prelude::*;
-use rand::Rng;
 use std::collections::HashSet;
 use std::collections::HashMap;
 use fptree::ItemSet;
@@ -163,39 +160,6 @@ pub fn split_out_item(items: &Vec<u32>, item: u32) -> (Vec<u32>, Vec<u32>) {
     (antecedent, consequent)
 }
 
-fn generate_random_dataset(item_count: &HashMap<u32, u32>, num_transactions: usize) -> Index {
-    let mut total_item_count = item_count.iter().fold(0, |acc, (_, count)| acc + count);
-    let avg_transaction_len = (total_item_count as f64 / num_transactions as f64).ceil() as u32;
-    let mut items_remaining: Vec<(u32, u32)> = item_count
-        .iter()
-        .map(|(&item, &count)| (item, count))
-        .collect();
-
-    let mut index = Index::new();
-    // Generate the same number of transactions...
-    for _ in 0..num_transactions {
-        let mut transaction: Vec<u32> = vec![];
-        let mut rng = rand::thread_rng();
-        // Generate a random transaction of the same length...
-        for _ in 0..avg_transaction_len {
-            if total_item_count == 0 {
-                break;
-            }
-            let mut n = rng.gen_range(0, total_item_count);
-            let mut i = 0;
-            while n >= items_remaining[i].1 {
-                n -= items_remaining[i].1;
-                i += 1;
-            }
-            items_remaining[i].1 -= 1;
-            total_item_count -= 1;
-            transaction.push(items_remaining[i].0);
-        }
-        index.insert(&transaction);
-    }
-    index
-}
-
 pub fn generate_rules(
     itemsets: &Vec<ItemSet>,
     dataset_size: u32,
@@ -204,7 +168,6 @@ pub fn generate_rules(
     rare_items: &HashSet<u32>,
     index: &Index,
     ln_table: &[f64],
-    item_count: &HashMap<u32, u32>,
     disable_family_wise_rule_filtering: bool,
 ) -> HashSet<Rule> {
     // Create a lookup of itemset to support, so we can quickly determine
