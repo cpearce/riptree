@@ -119,7 +119,7 @@ fn find_pareto_rare_items(item_count: &HashMap<u32, u32>) -> HashSet<u32> {
     }
     items.sort_by(|&(_, a), &(_, b)| a.cmp(&b));
 
-    let threshold = (0.25 * item_count_sum as f64) as u32;
+    let threshold = (0.01 * item_count_sum as f64) as u32;
     let mut rare_items: HashSet<u32> = HashSet::new();
     let mut sum = 0;
     let mut prev_count = 0;
