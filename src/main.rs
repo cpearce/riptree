@@ -180,20 +180,29 @@ fn mine_rip_tree(args: &Arguments) -> Result<(), Box<Error>> {
     // Load the initial tree, by re-reading the data set and inserting
     // each transaction into the tree sorted by item frequency.
     let timer = Instant::now();
-    println!("Finding rare items...");
+    println!("Determining which items are rare...");
     let rare_items = match args.max_support_mode {
         MaxSupportMode::Gaussian => {
             find_gaussian_rare_items(&item_count, num_transactions, itemizer.max_item_id())
         }
         MaxSupportMode::Pareto => find_pareto_rare_items(&item_count),
     };
-    assert!(rare_items.len() > 0);
     println!(
         "{} of {} items are considered rare, took {} seconds.",
         rare_items.len(),
         item_count.len(),
         timer.elapsed().as_secs(),
     );
+
+    if rare_items.len() == 0 {
+        println!("Since 0 items are considered rare, giving up.");
+        return Ok(());
+    }
+
+    if rare_items.len() > 500 {
+        println!("Since there are more than 500 items considered rare, giving up!");
+        return Ok(());
+    }
 
     if args.log_rare_items {
         println!("Rare items:");
