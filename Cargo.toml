@@ -1,5 +1,5 @@
 [package]
-name = "arm"
+name = "riptree"
 version = "0.1.0"
 authors = ["Chris Pearce <chris@pearce.org.nz>"]
 
